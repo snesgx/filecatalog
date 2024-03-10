@@ -46,6 +46,19 @@ public class FileIndexerRepositoryImpl implements FileIndexerRepository {
         // Execute the stored procedure
         Map<String, Object> result = simpleJdbcCall.execute(inParams);
     } 
+ 
+    @Override
+    public void saveSingle(int DeviceID, FileInfo fileInfo) { //BATCH
+        jdbcTemplate.update("INSERT INTO fileindex (id, parent_id, device_id, file_name, file_size, is_directory, modification_date_time) " +
+          "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                         fileInfo.Id(),
+                        fileInfo.ParentID(),
+                        DeviceID,
+                        fileInfo.filePath(),
+                        fileInfo.fileSize(),
+                        fileInfo.isDirectory(),
+                        Timestamp.from(fileInfo.modificationDateTime()));
+    }    
     
     @Override
     @Transactional
@@ -79,6 +92,15 @@ public class FileIndexerRepositoryImpl implements FileIndexerRepository {
         return jdbcTemplate.queryForObject("select get_deviceid(?, ?)", short.class, hostname, separator);
     }
 
+    @Override
+    public FileInfo getSingleElement(short DeviceID, byte[] fileID){
+        try {
+            return jdbcTemplate.queryForObject("select * from fileindex where device_id=? and id=?", FileInfo.class, DeviceID, fileID);
+        } catch (Exception ex) {
+            return null;
+        }
+    }    
+    
     @Override
     public List<Map<String,Object>> getSummary(){
         return jdbcTemplate.queryForList("call sp_summary()");

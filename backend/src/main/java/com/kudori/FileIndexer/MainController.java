@@ -17,10 +17,9 @@ public class MainController {
         @Autowired
         FileIndexerSearch fis;
         
-        
 	@GetMapping("/indexing")
 	public int indexing(@RequestParam String path) {
-                return ie.StartIndexing(path);
+                return ie.startIndexing(path);
 	}
 
 	@GetMapping("/getsummary")

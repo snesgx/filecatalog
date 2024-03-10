@@ -48,7 +48,7 @@ public class IndexingEngine {
             }
         }
         
-        public int StartIndexing(String path) {
+        public int startIndexing(String path) {
             
                 isIndexing.set(true);
             
@@ -57,11 +57,11 @@ public class IndexingEngine {
                     System.out.println("Hostname: " + hostname);
                     
                     long startTime = System.currentTimeMillis();                    
-                    int test = listAndInsertFilesUsingFilesList(path);  
+                    int count = listAndInsertFilesUsingFilesList(path);  
                     System.out.println("Time taken: " + (System.currentTimeMillis() - startTime) + " milliseconds");
                     
                     isIndexing.set(false);
-                    return test;
+                    return count;
                 } catch (IOException ex) {
                     System.out.println(ex.toString());
                 }
@@ -84,19 +84,17 @@ public class IndexingEngine {
 
             short DeviceID = repository.getDeviceID(hostname, fs.getSeparator());
 
+            //Ensuring that all the parents of the given path, exist:
+            ensureAllParents(DeviceID, targetPath);
+            
             //Deleting existing path and children
-            try {
-                repository.deletePath(DeviceID,GetMD5HashAsBytes(targetPath.toString()));
-            } catch (NoSuchAlgorithmException ex) {
-                Logger.getLogger(IndexingEngine.class.getName()).log(Level.SEVERE, null, ex);
-            }
+            repository.deletePath(DeviceID,getMD5HashAsBytes(targetPath.toString()));
             
             Files.walkFileTree(targetPath, new SimpleFileVisitor<Path>() {
                 @Override
                 public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
                     addElement(file, attrs);
-                    return FileVisitResult.CONTINUE;
-                    
+                    return FileVisitResult.CONTINUE;                   
                 }
 
                 @Override
@@ -108,28 +106,19 @@ public class IndexingEngine {
                 @Override
                 public FileVisitResult visitFileFailed(Path file, IOException exc) throws IOException {
                     addElement(file,Files.readAttributes(file, BasicFileAttributes.class));
-                    
-                    try { //Reporting error into table
-                        repository.saveFileError(DeviceID, GetMD5HashAsBytes(file.toString()), exc.toString());
-                    } catch (NoSuchAlgorithmException ex) {
-                        Logger.getLogger(IndexingEngine.class.getName()).log(Level.SEVERE, null, ex);
-                    }
-                    
+                    repository.saveFileError(DeviceID, getMD5HashAsBytes(file.toString()), exc.toString());
                     return FileVisitResult.CONTINUE;
                 }
                 
                 //Add the element to the DB
                 public void addElement(Path file, BasicFileAttributes attrs){
-                    try {
-                            result.add(new FileInfo( GetMD5HashAsBytes(file.toString()),
-                                    file.getParent() != null ? GetMD5HashAsBytes(file.getParent().toString()) : null,
+
+                    result.add(new FileInfo( getMD5HashAsBytes(file.toString()),
+                                    file.getParent() != null ? getMD5HashAsBytes(file.getParent().toString()) : null,
                                     file.getFileName() != null ? file.getFileName().toString() : "",
                                     attrs.size(),
                                     attrs.isDirectory(),
                                     attrs.lastModifiedTime().toInstant()));
-                    } catch (NoSuchAlgorithmException ex) {
-                        Logger.getLogger(IndexingEngine.class.getName()).log(Level.SEVERE, null, ex);
-                    }         
 
                     if (result.size() >= 1000) { //Partial insertion of results, this avoids overusing RAM
                         repository.saveAll(DeviceID, result);
@@ -151,14 +140,49 @@ public class IndexingEngine {
             return itemsCount.get();
 
     
-}
+        }
+        
+        //Checking all the parents all the way to the root
+        private void ensureAllParents(short DeviceID, Path startingPath) {
+            Path pathToCheck = startingPath.getParent();
+            
+            while (pathToCheck != null) {
+                
+                byte[] md5OfFile = getMD5HashAsBytes(pathToCheck.toString());
+                
+                if (repository.getSingleElement(DeviceID, md5OfFile) == null ) {
+                    
+                    BasicFileAttributes attrs = null;
+                    try {
+                        attrs = Files.readAttributes(pathToCheck, BasicFileAttributes.class);
+                    } catch (IOException ex) {
+                        Logger.getLogger(IndexingEngine.class.getName()).log(Level.SEVERE, null, ex);
+                    }
+                    
+                    repository.saveSingle(DeviceID,new FileInfo( md5OfFile,
+                                    pathToCheck.getParent() != null ? getMD5HashAsBytes(pathToCheck.getParent().toString()) : null,
+                                    pathToCheck.getFileName() != null ? pathToCheck.getFileName().toString() : "",
+                                    attrs != null ? attrs.size() : -1,
+                                    attrs != null ? attrs.isDirectory() : true,
+                                    attrs != null ? attrs.lastModifiedTime().toInstant() : null ));
+                }
+                pathToCheck = pathToCheck.getParent();
+            }
+
+        }
         
         //UUID has the same size as MD5 sum, so we use as an ID, 
         //  it also makes easier to reconstruct parts of the file system tree, because the ID of the parent folder is always the same
-        private byte[] GetMD5HashAsBytes(String string) throws NoSuchAlgorithmException {
-            MessageDigest md = MessageDigest.getInstance("MD5");
-            md.update(string.getBytes());
-            return md.digest();
+        private byte[] getMD5HashAsBytes(String string) {
+            try {
+                MessageDigest md = MessageDigest.getInstance("MD5");
+                md.update(string.getBytes());
+                return md.digest();
+            } catch (NoSuchAlgorithmException ex) {
+                Logger.getLogger(IndexingEngine.class.getName()).log(Level.SEVERE, null, ex);
+            }
+            
+            return null;
         }        
         
 }
