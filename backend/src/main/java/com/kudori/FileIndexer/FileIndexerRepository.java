@@ -26,7 +26,7 @@ interface FileIndexerRepository {
     void saveFileError(int DeviceID, byte[] fileID, String errormsg);
     
     //Getting information for a single file or directory
-    FileInfo getSingleElement(short DeviceID, byte[] fileID);
+    boolean elementExists(short DeviceID, byte[] fileID);
     
     //Getting the device ID assigned by the DB
     short getDeviceID(String hostname, String separator);

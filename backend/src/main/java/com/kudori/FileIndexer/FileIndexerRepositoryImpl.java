@@ -93,11 +93,11 @@ public class FileIndexerRepositoryImpl implements FileIndexerRepository {
     }
 
     @Override
-    public FileInfo getSingleElement(short DeviceID, byte[] fileID){
+    public boolean elementExists(short DeviceID, byte[] fileID){
         try {
-            return jdbcTemplate.queryForObject("select * from fileindex where device_id=? and id=?", FileInfo.class, DeviceID, fileID);
+            return jdbcTemplate.queryForObject("select count(*) from fileindex where device_id=? and id=?", Integer.class, DeviceID, fileID) > 0;
         } catch (Exception ex) {
-            return null;
+            return false;
         }
     }    
     

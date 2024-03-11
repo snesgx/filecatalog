@@ -18,6 +18,7 @@ import java.nio.file.FileVisitResult;
 import java.nio.file.Path;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
+import java.time.Duration;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
@@ -35,6 +36,7 @@ public class IndexingEngine {
         @Autowired
         FileIndexerRepository repository;
     
+        private AtomicInteger itemsCount = new AtomicInteger(0);
         private final AtomicBoolean isIndexing = new AtomicBoolean(false);
         
         String hostname = "";
@@ -48,8 +50,9 @@ public class IndexingEngine {
             }
         }
         
-        public int startIndexing(String path) {
+        public String startIndexing(String path) {
             
+                itemsCount.set(0);
                 isIndexing.set(true);
             
                 try {
@@ -58,16 +61,13 @@ public class IndexingEngine {
                     
                     long startTime = System.currentTimeMillis();                    
                     int count = listAndInsertFilesUsingFilesList(path);  
-                    System.out.println("Time taken: " + (System.currentTimeMillis() - startTime) + " milliseconds");
                     
                     isIndexing.set(false);
-                    return count;
+                    return String.valueOf(count) + " elements, time taken: " + formatDuration(System.currentTimeMillis() - startTime);
                 } catch (IOException ex) {
                     System.out.println(ex.toString());
-                }
-                { 
                     isIndexing.set(false);
-                    return -1; 
+                    return "Error"; 
                 }
                 
         }
@@ -75,7 +75,6 @@ public class IndexingEngine {
     
         public int listAndInsertFilesUsingFilesList(String dir) throws IOException {
             
-            AtomicInteger itemsCount = new AtomicInteger(0);
             List<FileInfo> result = new ArrayList<>();
             
             Path targetPath = Paths.get(dir);
@@ -150,7 +149,7 @@ public class IndexingEngine {
                 
                 byte[] md5OfFile = getMD5HashAsBytes(pathToCheck.toString());
                 
-                if (repository.getSingleElement(DeviceID, md5OfFile) == null ) {
+                if (!repository.elementExists(DeviceID, md5OfFile)) {
                     
                     BasicFileAttributes attrs = null;
                     try {
@@ -183,6 +182,20 @@ public class IndexingEngine {
             }
             
             return null;
+        }        
+ 
+        public static String formatDuration(long milliseconds) {
+            Duration duration = Duration.ofMillis(milliseconds);
+            long hours = duration.toHours();
+            long minutes = duration.toMinutesPart(); 
+            long seconds = duration.toSecondsPart(); 
+
+            return String.format("%d:%02d:%02d", hours, minutes, seconds);
+        }        
+        
+        
+        public AtomicInteger getItemsCount() {
+            return itemsCount;
         }        
         
 }

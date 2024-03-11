@@ -35,5 +35,6 @@ select a.fs_separator,a.device_name, count(*) files, format_bytes(sum(file_size)
 where a.id = b.device_id 
 group by a.fs_separator,a.device_name;
 
-Select HEX(id) from fileindex f where device_id =3 order by id;
+Select HEX(id) from fileindex f where device_id =3 and HEX(id) like 'FC4020%' order by id desc;
 
+Select 'HX\xDA\xB5\xB4\xAC\x16\xAD+}'F\x98\xC2S*-3' ;
